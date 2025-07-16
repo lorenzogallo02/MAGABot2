@@ -12,7 +12,7 @@ You can find the original Magabot platform and documentation here:
 During my collaboration at IDMind, we explored a new vision:  
 The platform would no longer carry a laptop, but a **desktop robot**, turning Magabot into a mobile base for another robot.
 
-### New System Architecture: Robot-on-Robot
+## New System Architecture: Robot-on-Robot
 The system is composed of three main units:
 
 ### Magabot Platform
