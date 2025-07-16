@@ -47,7 +47,9 @@ The system is composed of three main units:
 ### Dynamic Activation
 - As soon as the desktop robot is **removed**, the connection is lost and the platform becomes idle, waiting for the next session.
 
-### Obstacle Avoidance Mode
+CODE : arduino_slave.ino, esp32_bridge.ino, magabot_threads.py
+
+### Obstacle Avoidance Mode (Arduino + ESP32)
 - A fully autonomous mode was implemented using:
   - 3 IR sensors
   - 2 bumpers
@@ -57,8 +59,10 @@ The system is composed of three main units:
   - Stop and back up
   - Calculate a safe direction
   - Move forward and resume navigation
+CODE : arduino_autonomous.ino, esp32_bridge.ino
 
 ### LIDAR Integration
 - In the last week, I implemented a **LIDAR data reader**, designed to:
   - Stream scan data from the LiDAR sensor
   - Prepare the platform for future mapping and SLAM-based navigation
+CODE : lidar_reader.py
