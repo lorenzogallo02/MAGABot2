@@ -65,11 +65,11 @@ CODE : arduino_slave.ino, esp32_bridge.ino, magabot_threads5.py
 CODE : arduino_autonomous.ino, esp32_bridge.ino
 
 ### LIDAR Integration
-- In the last week, I implemented a **LIDAR data reader**, designed to:
+- In the last week, I implemented a **LIDAR data viewer**, designed to:
   - Stream scan data from the LiDAR sensor
   - Prepare the platform for future mapping and SLAM-based navigation
   
-CODE : lidar_reader.py
+CODE : lidar_viewer.py
 
 ## Next steps
 - Integrate the autonomous behaviour in the Raspberry and control panel
