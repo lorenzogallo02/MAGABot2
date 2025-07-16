@@ -34,7 +34,7 @@ The system is composed of three main units:
 - The desktop robot is placed on top of the Magabot platform.
 - A button is used to detect its presence.
 - When the robot is detected:
-  - A **Flask web server** is launched, and a web interface becomes accessible with:
+  - A **Flask web server** is launched, and a web control panel becomes accessible with:
     - A **video stream**
     - A **manual driving mode**
     - A **“follow person” mode**
@@ -70,3 +70,9 @@ CODE : arduino_autonomous.ino, esp32_bridge.ino
   - Prepare the platform for future mapping and SLAM-based navigation
   
 CODE : lidar_reader.py
+
+## Next steps
+- Integrate the autonomous behaviour in the Raspberry and control panel
+- Understand how to create a human-raspberry interaction (an idea could be voice recognition)
+- Filter the LIDAR readings to have a clean map of the surroundings
+
