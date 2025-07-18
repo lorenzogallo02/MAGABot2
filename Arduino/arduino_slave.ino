@@ -1,10 +1,5 @@
 #include <Wire.h>  //This line includes the I2C library that allows the Arduino to communicate over the I2C protocol (necessary to communicae with the sonar sensors)
-#include <SoftwareSerial.h>
-SoftwareSerial SerialESP(10, 11); // D10 (TX) → ESP32 GPIO16
 
-
-#define REGISTER_CONFIG (16)
-#define REGISTER_OUTPUT (16)
 
 int dir1=0,dir2=0; //motors directions
 int inByte = 'p'; //this stores a single incoming character from the serial port, 'p' is just a default placeholder value (ASCII character 'p')
@@ -58,7 +53,6 @@ void setup() {
   
   Wire.begin();
   Serial.begin(9600);
-  //SerialESP.begin(9600); 
   
   // Wire.setClock(100000);  // Lower the I2C bus speed to 100kHz
 
@@ -70,25 +64,89 @@ void setup() {
   Wire.write((byte) 0);
   Wire.write((byte) 0x77);
   Wire.endTransmission(); 
+
+  actuateMotors(0, 0);
 }
 
-void loop() 
-{ 
-  // Read the battery status
-  // read_BAT();
+void loop() {
+  // Read sensors continuously in the loop
+  bumpRead();  // Read bumpers
+  irRead();    // Read IR sensors
+  readAllSonarMeasurements();  // Read sonar measurements
 
-  Wire.beginTransmission(0x39);
-  Wire.write((byte) 1);
-  Wire.write((byte) 0x6F);
-  Wire.write((byte) 0x6F);
-  Wire.write((byte) 0x03);
-  Wire.write((byte) 0x03);
+  if (Serial.available() > 0) {
+    inByte = Serial.read();
+    MagaBotControllerSerial();  // Process serial commands
+  }
+}
+
+void actuateMotors(int vel1, int vel2) {
+  vel2 = -veloc2;  // Invert velocity for second motor (depending on direction)
+
+  byte v1b1 = vel1 >> 8;
+  byte v1b2 = vel1 & 0xFF;
+  byte v2b1 = vel2 >> 8;
+  byte v2b2 = vel2 & 0xFF;
+
+  // Send left motor control via I2C (address 0x15)
+  Wire.beginTransmission(0x15);
+  Wire.write((byte)0);
+  Wire.write(v1b1);
+  Wire.write(v1b2);
+  Wire.write((byte)1);  // High byte
   Wire.endTransmission();
 
-
-  readAllSonarMeasurements();  // updates one sonar at a time
-  obstacleAvoid();             // uses Sonars[], ir[], bump[] to react
+  // Send right motor control via I2C (address 0x16)
+  Wire.beginTransmission(0x16);
+  Wire.write((byte)0);
+  Wire.write(v2b1);
+  Wire.write(v2b2);
+  Wire.write((byte)1);  // High byte
+  Wire.endTransmission();
 }
+
+void MagaBotControllerSerial() {
+  if (ponteiro == 0) {
+    if (inByte == 0x83) {  // Sonar data request
+      for (int o = 1; o < 6; o++) {
+        // Send sonar readings back (Sonars[] contains the latest values)
+        Serial.write((unsigned char)(Sonars[o] >> 8));  // High byte
+        Serial.write((unsigned char)(Sonars[o] & 0xFF));  // Low byte
+      }
+    } else if (inByte == 0x66) {  // Bumper status request
+      // Send bumper status (0 = not pressed, 1 = pressed)
+      Serial.write(bump[0] ? 1 : 0);  // Left bumper
+      Serial.write(bump[1] ? 1 : 0);  // Right bumper
+    } else if (inByte == 0x73) {  // IR sensor request
+      // Send IR sensor values (1 or 0 based on IR detection)
+      for (int i = 0; i < 3; i++) {
+        Serial.write((unsigned char)(ir[i] ? 1 : 0));  // Send 1 or 0
+      }
+    } else if (inByte == 0x4B) {  // Battery status request
+      Serial.write((unsigned char)(baterias >> 8));  // Battery high byte
+      Serial.write((unsigned char)(baterias & 0xFF));  // Battery low byte
+    } else if (inByte == 0x86) {  // Motor control header
+      ponteiro = 1;
+    }
+  } else if (ponteiro == 1) {
+    veloc1 = inByte;
+    ponteiro = 2;
+  } else if (ponteiro == 2) {
+    dir1 = inByte;
+    ponteiro = 3;
+  } else if (ponteiro == 3) {
+    veloc2 = inByte;
+    ponteiro = 4;
+  } else if (ponteiro == 4) {
+    dir2 = inByte;
+    ponteiro = 0;
+    if (dir1 == 1) veloc1 = -veloc1;  // Reverse left motor
+    if (dir2 == 1) veloc2 = -veloc2;  // Reverse right motor
+
+    actuateMotors(veloc1, veloc2);
+  }
+}
+
 
 void readAllSonarMeasurements()
 {
@@ -146,37 +204,6 @@ void readAllSonarMeasurements()
     }
 }
 
-void actuateMotors(int vel1, int vel2)
-{
-  // Invert velocity of second motor (due to rotational direction)
-  vel2 = -vel2;
-
-  // Split vel1 into two bytes (for I2C communication)
-  byte v1b1 = vel1 >> 8; //High byte. Shift velocity 8 bits to the right to extract the 8 most significant bits
-  byte v1b2 = vel1 & 0xFF; // Low byte. Mask the lower 8 bits to extract the 8 least significant bits
-
-  // Split vel2 into two bytes
-  byte v2b1 = vel2 >> 8;
-  byte v2b2 = vel2 & 0xFF; 
-  
-  Wire.beginTransmission(0x15);
-  Wire.write((byte) 0);
-  Wire.write((byte) v1b1);
-  Wire.write((byte) v1b2);
-  Wire.write((byte) 1);    //  high byte
-  Wire.endTransmission();
-  
-  Wire.beginTransmission(0x16);
-  Wire.write((byte) 0);
-  Wire.write((byte) v2b1);
-  Wire.write((byte) v2b2);
-  //     Wire.write((byte) veloc2);  //  low byte
-  //      Wire.write((byte) dir2);    //  high byte
-  Wire.write((byte) 1);    //  high byte
-  
-  Wire.endTransmission();
-}
-
 void irRead() 
 {
 //    Serial.println("Im reading the IR sensors");
@@ -198,123 +225,61 @@ void irRead()
 
 void bumpRead()
 {
-   bump[0] =(digitalRead(3)==1)?false:true;
-   bump[1] = (digitalRead(2)==1)?false:true;
-//   Serial.println(bump[0]);
-//   Serial.println(bump[1]);
+   bump[0] = (digitalRead(3) == LOW);   // left bumper
+   bump[1] = (digitalRead(2) == LOW);   // right bumper
 }
 
-int bestDirection = 3;  // Global variable 
-int bumpDirection = 0;  // 0 = none, 1 = left bump, 2 = right bump
 
 
-void obstacleAvoid() {
-  //irRead();
-  bumpRead();
+void read_clicks (void)
+{
+  //primeira parte
+      Wire.beginTransmission(0x15);
+      Wire.write((byte) 0x19);
+      Wire.write((byte) 1);
+      Wire.endTransmission();
 
-  veloc1 = 15;
-  veloc2 = 15;
-  int minSafeDistance = 80;
+delay(1);  
 
-  // === 1. Detect obstacle ===
-  if (becoState == 0) {
-    if (bump[0]) bumpDirection = 1;
-    else if (bump[1]) bumpDirection = 2;
-    else bumpDirection = 0;
+      Wire.beginTransmission(0x16);
+      Wire.write((byte) 0x19);
+      Wire.write((byte) 1);  
+      Wire.endTransmission();
 
-    if (bump[0] || bump[1] || ir[0] || ir[1] || ir[2] || Sonars[3] < minSafeDistance) {
-      Serial.println("Obstacle detected → STOP");
-      becoState = 1;
-      actuateMotors(0, 0);
-      becoTime = millis() + 500;
-      return;
+delay(1);  
+
+    Wire.beginTransmission(0x15); // transmit to device 0x15
+    Wire.write((byte) 0x15);             // sets register pointer to echo #1 register (0x15)
+    Wire.endTransmission();
+
+    Wire.requestFrom(0x15, 2);
+    
+    if(2 <= Wire.available())    // if two bytes were received
+    {
+       Serial.write(Wire.read());
+       Serial.write(Wire.read());
     }
-  }
-
-  // === 2. Back away ===
-  if (becoState == 1 && millis() > becoTime) {
-    Serial.println("Backing up");
-    becoState = 2;
-
-    if (bumpDirection == 1) {
-      Serial.println("Left bumper → turning right while backing");
-      actuateMotors(-veloc1, -5);
-    } else if (bumpDirection == 2) {
-      Serial.println("Right bumper → turning left while backing");
-      actuateMotors(-5, -veloc2);
-    } else {
-      actuateMotors(-veloc1, -veloc2);  // straight back
+    
+     Wire.beginTransmission(0x16); // transmit to device 0x16
+     Wire.write((byte) 0x15);             // sets register pointer to echo #1 register (0x15)
+     Wire.endTransmission();
+    
+    Wire.requestFrom(0x16, 2);
+    if(2 <= Wire.available())    // if two bytes were received
+    {
+       Serial.write(Wire.read());
+       Serial.write(Wire.read());
     }
-
-    bumpDirection = 0;
-    becoTime = millis() + 1000;
-    return;
-  }
-
-  // === 3. Pause and calculate direction ===
-  if (becoState == 2 && millis() > becoTime) {
-    Serial.println("⏸ Pausing + Calculating best direction");
-    becoState = 3;
-    actuateMotors(0, 0);
-    becoTime = millis() + 800;
-
-    bestDirection = 3;
-    int bestValue = Sonars[3];
-
-    for (int i = 1; i <= 5; i++) {
-      if (Sonars[i] > bestValue + 20) {
-        bestValue = Sonars[i];
-        bestDirection = i;
-      }
-    }
-
-    Serial.println("Chosen direction: " + String(bestDirection));
-    return;
-  }
-
-  // === 4. Move forward briefly to commit ===
-  if (becoState == 3 && millis() > becoTime) {
-    Serial.println("Commit to direction → move forward");
-    becoState = 4;
-    actuateMotors(veloc1, veloc2);
-    becoTime = millis() + 1200;
-    return;
-  }
-
-  // === 5. Resume normal navigation ===
-  if (becoState == 4 && millis() > becoTime) {
-    Serial.println("Resuming full autonomy");
-    becoState = 0;
-    return;
-  }
-
-  // === 6. Normal motion ===
-  if (becoState == 0) {
-    switch (bestDirection) {
-      case 1:
-      case 2:
-        actuateMotors(veloc1 / 2, veloc2);  // turn left
-        break;
-      case 3:
-        actuateMotors(veloc1, veloc2);      // forward
-        break;
-      case 4:
-      case 5:
-        actuateMotors(veloc1, veloc2 / 2);  // turn right
-        break;
-    }
-  }
-
-  // === LEDs for visual feedback ===
-  if (becoState == 0) {
-    analogWrite(9, 255); analogWrite(10, 255); analogWrite(11, 0);     // Yellow
-  } else if (becoState == 1) {
-    analogWrite(9, 255); analogWrite(10, 0);   analogWrite(11, 0);     // Red
-  } else if (becoState == 2) {
-    analogWrite(9, 255); analogWrite(10, 0);   analogWrite(11, 255);   // Magenta
-  } else if (becoState == 3) {
-    analogWrite(9, 0);   analogWrite(10, 0);   analogWrite(11, 255);   // Blue
-  } else if (becoState == 4) {
-    analogWrite(9, 255); analogWrite(10, 255); analogWrite(11, 0);     // Yellow (boost)
-  }
+  //primeira parte
+    Wire.beginTransmission(0x15);
+    Wire.write((byte) 0x14);
+    Wire.write((byte) 0);
+    Wire.endTransmission();
+    delay(1);  
+  
+    Wire.beginTransmission(0x16);
+    Wire.write((byte) 0x14);
+    Wire.write((byte) 0);
+    Wire.endTransmission();
+    delay(1);  
 }
