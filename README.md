@@ -47,6 +47,10 @@ The system is composed of three main units:
 ### Dynamic Activation
 - As soon as the desktop robot is **removed**, the connection is lost and the platform becomes idle, waiting for the next session.
 
+<img src="Images/Control_Panel.png"  width="600"/> 
+
+<img src="Images/No_desktop_robot.png"  width="600"/> 
+
 All behaviors (camera, joystick, follow-person, bumper response, button state) are implemented using **Python threads**, **events**, and **monitors** to ensure reliable concurrent execution and safe switching between modes
 
 CODE : arduino_slave.ino, esp32_bridge.ino, magabot_threads5.py
