@@ -73,6 +73,6 @@ CODE : lidar_viewer.py
 
 ## Next steps
 - Integrate the autonomous behaviour in the Raspberry and control panel
-- Understand how to create a human-raspberry interaction (an idea could be voice recognition)
+- Understand how to create a human-robot interaction (an idea could be voice recognition)
 - Filter the LIDAR readings to have a clean map of the surroundings
 
